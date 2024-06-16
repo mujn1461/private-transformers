@@ -301,7 +301,8 @@ class LlamaAttention(nn.Module):
         output_attentions: bool = False,
         use_cache: bool = False,
         cache_position: Optional[torch.LongTensor] = None,
-        story_end_index:Optional[int] = None,
+        recall_start_index:Optional[int] = None,
+        attention_scale:Optional[float] = None,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
         bsz, q_len, _ = hidden_states.size()
 
@@ -349,7 +350,18 @@ class LlamaAttention(nn.Module):
 
         # upcast attention to fp32
         attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
-        print(attn_weights.shape)
+        # print(attn_weights.shape) # nbatch,nheads,fromtokens,totokens
+        # to-do: exclude BOS token?
+        attn_weights_to_original = attn_weights[:,:,recall_start_index:,:recall_start_index] # nbatch,nheads,recall_tokens,story_tokens
+        sum_attn_to_original = torch.sum(attn_weights_to_original,axis = -1) # nbatch,nheads,recall_tokens
+        num_to_tokens = recall_start_index
+        new_wts_numerator = torch.unsqueeze(sum_attn_to_original,-1)*(attn_weights_to_original+attention_scale)
+        new_wts_denominator = torch.unsqueeze(sum_attn_to_original+num_to_tokens*attention_scale,-1)
+        new_attn_weights_to_original = new_wts_numerator/new_wts_denominator
+        new_sum_attn_to_original = torch.sum(new_attn_weights_to_original,axis = -1)
+        assert torch.allclose(sum_attn_to_original,new_sum_attn_to_original)
+        attn_weights[:,:,recall_start_index:,:recall_start_index] = new_attn_weights_to_original
+
         attn_weights = nn.functional.dropout(attn_weights, p=self.attention_dropout, training=self.training)
         attn_output = torch.matmul(attn_weights, value_states)
 
@@ -672,7 +684,7 @@ class LlamaDecoderLayer(nn.Module):
     def __init__(self, config: LlamaConfig, layer_idx: int):
         super().__init__()
         self.hidden_size = config.hidden_size
-        print(config._attn_implementation)
+        #print(config._attn_implementation)
         self.self_attn = LLAMA_ATTENTION_CLASSES[config._attn_implementation](config=config, layer_idx=layer_idx)
 
         self.mlp = LlamaMLP(config)
@@ -688,7 +700,8 @@ class LlamaDecoderLayer(nn.Module):
         output_attentions: Optional[bool] = False,
         use_cache: Optional[bool] = False,
         cache_position: Optional[torch.LongTensor] = None,
-        story_end_index:Optional[int] = None,
+        recall_start_index:Optional[int] = None,
+        attention_scale:Optional[float] = None,
     ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
         """
         Args:
@@ -717,7 +730,8 @@ class LlamaDecoderLayer(nn.Module):
             output_attentions=output_attentions,
             use_cache=use_cache,
             cache_position=cache_position,
-            story_end_index=story_end_index,
+            recall_start_index=recall_start_index,
+            attention_scale=attention_scale,
         )
         hidden_states = residual + hidden_states
 
@@ -903,7 +917,8 @@ class LlamaModel(LlamaPreTrainedModel):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
         cache_position: Optional[torch.LongTensor] = None,
-        story_end_index: Optional[int] = None,
+        recall_start_index: Optional[int] = None,
+        attention_scale:Optional[float] = None,
     ) -> Union[Tuple, BaseModelOutputWithPast]:
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
@@ -1130,7 +1145,8 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
         cache_position: Optional[torch.LongTensor] = None,
-        story_end_index: Optional[int] = None,
+        recall_start_index: Optional[int] = None,
+        attention_scale:Optional[float] = None,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
         r"""
         Args:
@@ -1175,7 +1191,8 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
             cache_position=cache_position,
-            story_end_index=story_end_index,
+            recall_start_index=recall_start_index,
+            attention_scale=attention_scale,
         )
 
         hidden_states = outputs[0]
