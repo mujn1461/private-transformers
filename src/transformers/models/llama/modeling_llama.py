@@ -351,16 +351,17 @@ class LlamaAttention(nn.Module):
         # upcast attention to fp32
         attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
         # print(attn_weights.shape) # nbatch,nheads,fromtokens,totokens
-        # to-do: exclude BOS token?
-        attn_weights_to_original = attn_weights[:,:,recall_start_index:,:recall_start_index] # nbatch,nheads,recall_tokens,story_tokens
-        sum_attn_to_original = torch.sum(attn_weights_to_original,axis = -1) # nbatch,nheads,recall_tokens
-        num_to_tokens = recall_start_index
-        new_wts_numerator = torch.unsqueeze(sum_attn_to_original,-1)*(attn_weights_to_original+attention_scale)
-        new_wts_denominator = torch.unsqueeze(sum_attn_to_original+num_to_tokens*attention_scale,-1)
-        new_attn_weights_to_original = new_wts_numerator/new_wts_denominator
-        new_sum_attn_to_original = torch.sum(new_attn_weights_to_original,axis = -1)
-        assert torch.allclose(sum_attn_to_original,new_sum_attn_to_original)
-        attn_weights[:,:,recall_start_index:,:recall_start_index] = new_attn_weights_to_original
+        if attention_scale is not None:
+            # to-do: exclude BOS token?
+            attn_weights_to_original = attn_weights[:,:,recall_start_index:,:recall_start_index] # nbatch,nheads,recall_tokens,story_tokens
+            sum_attn_to_original = torch.sum(attn_weights_to_original,axis = -1) # nbatch,nheads,recall_tokens
+            num_to_tokens = recall_start_index
+            new_wts_numerator = torch.unsqueeze(sum_attn_to_original,-1)*(attn_weights_to_original+attention_scale)
+            new_wts_denominator = torch.unsqueeze(sum_attn_to_original+num_to_tokens*attention_scale,-1)
+            new_attn_weights_to_original = new_wts_numerator/new_wts_denominator
+            new_sum_attn_to_original = torch.sum(new_attn_weights_to_original,axis = -1)
+            assert torch.allclose(sum_attn_to_original,new_sum_attn_to_original)
+            attn_weights[:,:,recall_start_index:,:recall_start_index] = new_attn_weights_to_original
 
         attn_weights = nn.functional.dropout(attn_weights, p=self.attention_dropout, training=self.training)
         attn_output = torch.matmul(attn_weights, value_states)
@@ -990,6 +991,8 @@ class LlamaModel(LlamaPreTrainedModel):
                     output_attentions=output_attentions,
                     use_cache=use_cache,
                     cache_position=cache_position,
+                    recall_start_index=recall_start_index,
+                    attention_scale=attention_scale,
                 )
 
             hidden_states = layer_outputs[0]
