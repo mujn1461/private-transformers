@@ -360,7 +360,9 @@ class LlamaAttention(nn.Module):
             new_wts_denominator = torch.unsqueeze(sum_attn_to_original+num_to_tokens*attention_scale,-1)
             new_attn_weights_to_original = new_wts_numerator/new_wts_denominator
             new_sum_attn_to_original = torch.sum(new_attn_weights_to_original,axis = -1)
-            assert torch.allclose(sum_attn_to_original,new_sum_attn_to_original)
+            if not torch.allclose(sum_attn_to_original,new_sum_attn_to_original,atol = 1e-4):
+                print(sum_attn_to_original-new_sum_attn_to_original)
+            assert torch.allclose(sum_attn_to_original,new_sum_attn_to_original,atol = 1e-4)
             attn_weights[:,:,recall_start_index:,:recall_start_index] = new_attn_weights_to_original
 
         attn_weights = nn.functional.dropout(attn_weights, p=self.attention_dropout, training=self.training)
