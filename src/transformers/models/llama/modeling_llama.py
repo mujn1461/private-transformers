@@ -356,7 +356,7 @@ class LlamaAttention(nn.Module):
             attn_weights_to_original = attn_weights[:,:,recall_start_index:,1:recall_start_index] # nbatch,nheads,recall_tokens,story_tokens (exclude BOS)
             attn_weights_to_original = attn_weights_to_original.to(torch.float32)
             sum_attn_to_original = torch.sum(attn_weights_to_original,axis = -1) # nbatch,nheads,recall_tokens
-            num_to_tokens = recall_start_index
+            num_to_tokens = recall_start_index-1
             new_wts_numerator = torch.unsqueeze(sum_attn_to_original,-1)*(attn_weights_to_original+attention_scale)
             new_wts_denominator = torch.unsqueeze(sum_attn_to_original+num_to_tokens*attention_scale,-1)
             new_attn_weights_to_original = new_wts_numerator/new_wts_denominator
