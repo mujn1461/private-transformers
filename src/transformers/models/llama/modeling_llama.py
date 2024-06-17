@@ -353,7 +353,7 @@ class LlamaAttention(nn.Module):
         # print(attn_weights.shape) # nbatch,nheads,fromtokens,totokens
         if attention_scale is not None:
             # to-do: exclude BOS token?
-            attn_weights_to_original = attn_weights[:,:,recall_start_index:,:recall_start_index] # nbatch,nheads,recall_tokens,story_tokens
+            attn_weights_to_original = attn_weights[:,:,recall_start_index:,1:recall_start_index] # nbatch,nheads,recall_tokens,story_tokens (exclude BOS)
             attn_weights_to_original = attn_weights_to_original.to(torch.float32)
             sum_attn_to_original = torch.sum(attn_weights_to_original,axis = -1) # nbatch,nheads,recall_tokens
             num_to_tokens = recall_start_index
@@ -364,7 +364,7 @@ class LlamaAttention(nn.Module):
             if not torch.allclose(sum_attn_to_original,new_sum_attn_to_original,atol = 1e-4):
                 print(sum_attn_to_original-new_sum_attn_to_original)
             assert torch.allclose(sum_attn_to_original,new_sum_attn_to_original,atol = 1e-4)
-            attn_weights[:,:,recall_start_index:,:recall_start_index] = new_attn_weights_to_original.to(query_states.dtype)
+            attn_weights[:,:,recall_start_index:,1:recall_start_index] = new_attn_weights_to_original.to(query_states.dtype)
 
         attn_weights = nn.functional.dropout(attn_weights, p=self.attention_dropout, training=self.training)
         attn_output = torch.matmul(attn_weights, value_states)
