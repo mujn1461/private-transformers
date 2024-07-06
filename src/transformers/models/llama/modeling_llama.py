@@ -1318,7 +1318,7 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
             cache_position = cache_position[-input_length:]
 
         if attention_scale is not None:
-            recall_start_index = input_ids.shape[1]-5 # for llama3 -5 gets rid of the start of generation prompt so that part of attention is still normal
+            assert recall_start_index is not None
 
         model_inputs.update(
             {
