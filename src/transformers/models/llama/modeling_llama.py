@@ -987,7 +987,7 @@ class LlamaModel(LlamaPreTrainedModel):
                     cache_position,
                 )
             else:
-                if num_layer < decoder_layer:
+                if start_layer is not None and num_layer < start_layer:
                     layer_outputs = decoder_layer(
                     hidden_states,
                     attention_mask=causal_mask,
@@ -1317,8 +1317,8 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
             cache_position = cache_position[-input_length:]
 
         if attention_scale is not None:
-            recall_start_index = input_ids.shape[1]-5
-            
+            recall_start_index = input_ids.shape[1]-5 # for llama3 -5 gets rid of the start of generation prompt so that part of attention is still normal
+
         model_inputs.update(
             {
                 "position_ids": position_ids,
