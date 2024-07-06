@@ -353,6 +353,7 @@ class LlamaAttention(nn.Module):
         # print(attn_weights.shape) # nbatch,nheads,fromtokens,totokens
         if attention_scale is not None:
             # to-do: exclude BOS token?
+            print(recall_start_index)
             attn_weights_to_original = attn_weights[:,:,recall_start_index:,1:recall_start_index] # nbatch,nheads,recall_tokens,story_tokens (exclude BOS)
             attn_weights_to_original = attn_weights_to_original.to(torch.float32)
             sum_attn_to_original = torch.sum(attn_weights_to_original,axis = -1) # nbatch,nheads,recall_tokens
