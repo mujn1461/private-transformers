@@ -923,6 +923,7 @@ class LlamaModel(LlamaPreTrainedModel):
         cache_position: Optional[torch.LongTensor] = None,
         recall_start_index: Optional[int] = None,
         attention_scale:Optional[float] = None,
+        start_layer:Optional[int] = None,
     ) -> Union[Tuple, BaseModelOutputWithPast]:
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
@@ -970,7 +971,7 @@ class LlamaModel(LlamaPreTrainedModel):
         all_self_attns = () if output_attentions else None
         next_decoder_cache = None
 
-        for decoder_layer in self.layers:
+        for num_layer,decoder_layer in enumerate(self.layers):
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
 
@@ -986,7 +987,8 @@ class LlamaModel(LlamaPreTrainedModel):
                     cache_position,
                 )
             else:
-                layer_outputs = decoder_layer(
+                if num_layer < decoder_layer:
+                    layer_outputs = decoder_layer(
                     hidden_states,
                     attention_mask=causal_mask,
                     position_ids=position_ids,
@@ -995,8 +997,20 @@ class LlamaModel(LlamaPreTrainedModel):
                     use_cache=use_cache,
                     cache_position=cache_position,
                     recall_start_index=recall_start_index,
-                    attention_scale=attention_scale,
+                    attention_scale=None,
                 )
+                else:
+                    layer_outputs = decoder_layer(
+                        hidden_states,
+                        attention_mask=causal_mask,
+                        position_ids=position_ids,
+                        past_key_value=past_key_values,
+                        output_attentions=output_attentions,
+                        use_cache=use_cache,
+                        cache_position=cache_position,
+                        recall_start_index=recall_start_index,
+                        attention_scale=attention_scale,
+                    )
 
             hidden_states = layer_outputs[0]
 
@@ -1153,6 +1167,7 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
         cache_position: Optional[torch.LongTensor] = None,
         recall_start_index: Optional[int] = None,
         attention_scale:Optional[float] = None,
+        start_layer:Optional[int] = None,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
         r"""
         Args:
@@ -1199,6 +1214,7 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
             cache_position=cache_position,
             recall_start_index=recall_start_index,
             attention_scale=attention_scale,
+            start_layer=start_layer,
         )
 
         hidden_states = outputs[0]
@@ -1243,6 +1259,8 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
         inputs_embeds=None,
         cache_position=None,
         use_cache=True,
+        recall_start_index=None,
+        attention_scale=None,
         **kwargs,
     ):
         past_length = 0
@@ -1298,6 +1316,9 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
         elif use_cache:
             cache_position = cache_position[-input_length:]
 
+        if attention_scale is not None:
+            recall_start_index = input_ids.shape[1]-5
+            
         model_inputs.update(
             {
                 "position_ids": position_ids,
@@ -1305,6 +1326,8 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
                 "past_key_values": past_key_values,
                 "use_cache": use_cache,
                 "attention_mask": attention_mask,
+                "recall_start_index": recall_start_index,
+                "attention_scale": attention_scale,
             }
         )
         return model_inputs
