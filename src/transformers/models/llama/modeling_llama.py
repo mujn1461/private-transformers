@@ -302,6 +302,7 @@ class LlamaAttention(nn.Module):
         use_cache: bool = False,
         cache_position: Optional[torch.LongTensor] = None,
         recall_start_index:Optional[int] = None,
+        story_start_index: int = 1,
         attention_scale:Optional[float] = None,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
         bsz, q_len, _ = hidden_states.size()
@@ -353,11 +354,11 @@ class LlamaAttention(nn.Module):
         # print(attn_weights.shape) # nbatch,nheads,fromtokens,totokens
         if attention_scale is not None:
             # to-do: exclude BOS token?
-            print(recall_start_index)
-            attn_weights_to_original = attn_weights[:,:,recall_start_index:,1:recall_start_index] # nbatch,nheads,recall_tokens,story_tokens (exclude BOS)
+            #print(recall_start_index)
+            attn_weights_to_original = attn_weights[:,:,recall_start_index:,story_start_index:recall_start_index] # nbatch,nheads,recall_tokens,story_tokens (exclude BOS)
             attn_weights_to_original = attn_weights_to_original.to(torch.float32)
             sum_attn_to_original = torch.sum(attn_weights_to_original,axis = -1) # nbatch,nheads,recall_tokens
-            num_to_tokens = recall_start_index-1
+            num_to_tokens = recall_start_index-story_start_index
             new_wts_numerator = torch.unsqueeze(sum_attn_to_original,-1)*(attn_weights_to_original+attention_scale)
             new_wts_denominator = torch.unsqueeze(sum_attn_to_original+num_to_tokens*attention_scale,-1)
             new_attn_weights_to_original = new_wts_numerator/new_wts_denominator
@@ -365,7 +366,7 @@ class LlamaAttention(nn.Module):
             if not torch.allclose(sum_attn_to_original,new_sum_attn_to_original,atol = 1e-4):
                 print(sum_attn_to_original-new_sum_attn_to_original)
             assert torch.allclose(sum_attn_to_original,new_sum_attn_to_original,atol = 1e-4)
-            attn_weights[:,:,recall_start_index:,1:recall_start_index] = new_attn_weights_to_original.to(query_states.dtype)
+            attn_weights[:,:,recall_start_index:,story_start_index:recall_start_index] = new_attn_weights_to_original.to(query_states.dtype)
 
         attn_weights = nn.functional.dropout(attn_weights, p=self.attention_dropout, training=self.training)
         attn_output = torch.matmul(attn_weights, value_states)
@@ -706,6 +707,7 @@ class LlamaDecoderLayer(nn.Module):
         use_cache: Optional[bool] = False,
         cache_position: Optional[torch.LongTensor] = None,
         recall_start_index:Optional[int] = None,
+        story_start_index:int = 1,
         attention_scale:Optional[float] = None,
     ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
         """
@@ -736,6 +738,7 @@ class LlamaDecoderLayer(nn.Module):
             use_cache=use_cache,
             cache_position=cache_position,
             recall_start_index=recall_start_index,
+            story_start_index=story_start_index,
             attention_scale=attention_scale,
         )
         hidden_states = residual + hidden_states
@@ -923,6 +926,7 @@ class LlamaModel(LlamaPreTrainedModel):
         return_dict: Optional[bool] = None,
         cache_position: Optional[torch.LongTensor] = None,
         recall_start_index: Optional[int] = None,
+        story_start_index: int = 1,
         attention_scale:Optional[float] = None,
         start_layer:Optional[int] = None,
     ) -> Union[Tuple, BaseModelOutputWithPast]:
@@ -998,6 +1002,7 @@ class LlamaModel(LlamaPreTrainedModel):
                     use_cache=use_cache,
                     cache_position=cache_position,
                     recall_start_index=recall_start_index,
+                    story_start_index=story_start_index,
                     attention_scale=None,
                 )
                 else:
@@ -1010,6 +1015,7 @@ class LlamaModel(LlamaPreTrainedModel):
                         use_cache=use_cache,
                         cache_position=cache_position,
                         recall_start_index=recall_start_index,
+                        story_start_index=story_start_index,
                         attention_scale=attention_scale,
                     )
 
@@ -1167,6 +1173,7 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
         return_dict: Optional[bool] = None,
         cache_position: Optional[torch.LongTensor] = None,
         recall_start_index: Optional[int] = None,
+        story_start_index: int = 1,
         attention_scale:Optional[float] = None,
         start_layer:Optional[int] = None,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
@@ -1214,6 +1221,7 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
             return_dict=return_dict,
             cache_position=cache_position,
             recall_start_index=recall_start_index,
+            story_start_index=story_start_index,
             attention_scale=attention_scale,
             start_layer=start_layer,
         )
@@ -1261,6 +1269,7 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
         cache_position=None,
         use_cache=True,
         recall_start_index=None,
+        story_start_index=1,
         attention_scale=None,
         **kwargs,
     ):
@@ -1328,6 +1337,7 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
                 "use_cache": use_cache,
                 "attention_mask": attention_mask,
                 "recall_start_index": recall_start_index,
+                "story_start_index":story_start_index,
                 "attention_scale": attention_scale,
             }
         )
