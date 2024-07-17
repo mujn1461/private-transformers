@@ -687,9 +687,9 @@ class GenerationMixin:
             and model_kwargs["cache_position"] is not None
         ):
             model_kwargs["cache_position"] = model_kwargs["cache_position"][-1:] + num_new_tokens
-
+        print(model_kwargs)
         if model_kwargs["attention_scale"] is not None:
-            model_kwargs["first_token"] = True
+            model_kwargs["first_token"] = False
         return model_kwargs
 
     def _reorder_cache(self, past_key_values, beam_idx):
