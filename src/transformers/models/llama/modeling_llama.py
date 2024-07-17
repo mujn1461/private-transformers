@@ -304,6 +304,7 @@ class LlamaAttention(nn.Module):
         recall_start_index:Optional[int] = None,
         story_start_index: int = 1,
         attention_scale:Optional[float] = None,
+        first_token:Optional[bool] = True,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
         bsz, q_len, _ = hidden_states.size()
 
@@ -354,7 +355,13 @@ class LlamaAttention(nn.Module):
         # print(attn_weights.shape) # nbatch,nheads,fromtokens,totokens
         if attention_scale is not None:
             #print(recall_start_index)
-            attn_weights_to_original = attn_weights[:,:,recall_start_index:,story_start_index:recall_start_index] # nbatch,nheads,recall_tokens,story_tokens (exclude BOS)
+            print('first_token',first_token)
+            if first_token: 
+                attn_weights_to_original = attn_weights[:,:,recall_start_index:,story_start_index:recall_start_index] # nbatch,nheads,recall_tokens,story_tokens (exclude BOS)
+            else:
+                # third dimension is : because for subsequent steps, the attention matrix is nbatch,nheads,1,number of tokens
+                # so it only has the single token attending to all existing ones
+                attn_weights_to_original = attn_weights[:,:,:,story_start_index:recall_start_index] 
             print('attn_weights',attn_weights.shape,'attn_wts_to_original',attn_weights_to_original.shape)
             attn_weights_to_original = attn_weights_to_original.to(torch.float32)
             sum_attn_to_original = torch.sum(attn_weights_to_original,axis = -1) # nbatch,nheads,recall_tokens
@@ -709,6 +716,7 @@ class LlamaDecoderLayer(nn.Module):
         recall_start_index:Optional[int] = None,
         story_start_index:int = 1,
         attention_scale:Optional[float] = None,
+        first_token:Optional[bool] = True,
     ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
         """
         Args:
@@ -740,6 +748,7 @@ class LlamaDecoderLayer(nn.Module):
             recall_start_index=recall_start_index,
             story_start_index=story_start_index,
             attention_scale=attention_scale,
+            first_token=first_token,
         )
         hidden_states = residual + hidden_states
 
@@ -929,6 +938,7 @@ class LlamaModel(LlamaPreTrainedModel):
         story_start_index: int = 1,
         attention_scale:Optional[float] = None,
         start_layer:Optional[int] = None,
+        first_token:Optional[bool] = None,
     ) -> Union[Tuple, BaseModelOutputWithPast]:
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
@@ -1004,6 +1014,7 @@ class LlamaModel(LlamaPreTrainedModel):
                     recall_start_index=recall_start_index,
                     story_start_index=story_start_index,
                     attention_scale=None,
+                    first_token=first_token,
                 )
                 else:
                     layer_outputs = decoder_layer(
@@ -1017,6 +1028,7 @@ class LlamaModel(LlamaPreTrainedModel):
                         recall_start_index=recall_start_index,
                         story_start_index=story_start_index,
                         attention_scale=attention_scale,
+                        first_token=first_token,
                     )
 
             hidden_states = layer_outputs[0]
@@ -1176,6 +1188,7 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
         story_start_index: int = 1,
         attention_scale:Optional[float] = None,
         start_layer:Optional[int] = None,
+        first_token:Optional[bool] = None,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
         r"""
         Args:
@@ -1224,6 +1237,7 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
             story_start_index=story_start_index,
             attention_scale=attention_scale,
             start_layer=start_layer,
+            first_token=first_token,
         )
 
         hidden_states = outputs[0]
@@ -1271,6 +1285,7 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
         recall_start_index=None,
         story_start_index=1,
         attention_scale=None,
+        first_token=True,
         **kwargs,
     ):
         past_length = 0
@@ -1339,6 +1354,7 @@ class LlamaForCausalLM(LlamaPreTrainedModel):
                 "recall_start_index": recall_start_index,
                 "story_start_index":story_start_index,
                 "attention_scale": attention_scale,
+                "first_token":first_token,
             }
         )
         return model_inputs
