@@ -687,7 +687,7 @@ class GenerationMixin:
             and model_kwargs["cache_position"] is not None
         ):
             model_kwargs["cache_position"] = model_kwargs["cache_position"][-1:] + num_new_tokens
-        print(model_kwargs)
+            
         if "attention_scale" in model_kwargs.keys() and model_kwargs["attention_scale"] is not None:
             model_kwargs["first_token"] = False
         return model_kwargs
