@@ -355,14 +355,14 @@ class LlamaAttention(nn.Module):
         # print(attn_weights.shape) # nbatch,nheads,fromtokens,totokens
         if attention_scale is not None:
             #print(recall_start_index)
-            print('first_token',first_token)
+            #print('first_token',first_token)
             if first_token: 
                 attn_weights_to_original = attn_weights[:,:,recall_start_index:,story_start_index:recall_start_index] # nbatch,nheads,recall_tokens,story_tokens (exclude BOS)
             else:
                 # third dimension is : because for subsequent steps, the attention matrix is nbatch,nheads,1,number of tokens
                 # so it only has the single token attending to all existing ones
                 attn_weights_to_original = attn_weights[:,:,:,story_start_index:recall_start_index] 
-            print('attn_weights',attn_weights.shape,'attn_wts_to_original',attn_weights_to_original.shape)
+            #print('attn_weights',attn_weights.shape,'attn_wts_to_original',attn_weights_to_original.shape)
             attn_weights_to_original = attn_weights_to_original.to(torch.float32)
             sum_attn_to_original = torch.sum(attn_weights_to_original,axis = -1) # nbatch,nheads,recall_tokens
             num_to_tokens = recall_start_index-story_start_index
