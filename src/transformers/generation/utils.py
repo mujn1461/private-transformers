@@ -688,7 +688,7 @@ class GenerationMixin:
         ):
             model_kwargs["cache_position"] = model_kwargs["cache_position"][-1:] + num_new_tokens
         print(model_kwargs)
-        if model_kwargs["attention_scale"] is not None:
+        if "attention_scale" in model_kwargs.keys() and model_kwargs["attention_scale"] is not None:
             model_kwargs["first_token"] = False
         return model_kwargs
 
@@ -2626,7 +2626,7 @@ class GenerationMixin:
         this_peer_finished = False
         unfinished_sequences = torch.ones(batch_size, dtype=torch.long, device=input_ids.device)
         model_kwargs = self._get_initial_cache_position(input_ids, model_kwargs)
-
+        
         while self._has_unfinished_sequences(this_peer_finished, synced_gpus, device=input_ids.device):
             # prepare model inputs
             model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
