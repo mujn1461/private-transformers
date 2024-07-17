@@ -353,9 +353,9 @@ class LlamaAttention(nn.Module):
         attn_weights = nn.functional.softmax(attn_weights, dim=-1, dtype=torch.float32).to(query_states.dtype)
         # print(attn_weights.shape) # nbatch,nheads,fromtokens,totokens
         if attention_scale is not None:
-            # to-do: exclude BOS token?
             #print(recall_start_index)
             attn_weights_to_original = attn_weights[:,:,recall_start_index:,story_start_index:recall_start_index] # nbatch,nheads,recall_tokens,story_tokens (exclude BOS)
+            print('attn_weights',attn_weights.shape,'attn_wts_to_original',attn_weights_to_original.shape)
             attn_weights_to_original = attn_weights_to_original.to(torch.float32)
             sum_attn_to_original = torch.sum(attn_weights_to_original,axis = -1) # nbatch,nheads,recall_tokens
             num_to_tokens = recall_start_index-story_start_index
