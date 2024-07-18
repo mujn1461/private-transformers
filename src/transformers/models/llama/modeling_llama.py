@@ -373,7 +373,12 @@ class LlamaAttention(nn.Module):
             if not torch.allclose(sum_attn_to_original,new_sum_attn_to_original,atol = 1e-4):
                 print(sum_attn_to_original-new_sum_attn_to_original)
             assert torch.allclose(sum_attn_to_original,new_sum_attn_to_original,atol = 1e-4)
-            attn_weights[:,:,recall_start_index:,story_start_index:recall_start_index] = new_attn_weights_to_original.to(query_states.dtype)
+            assert attn_weights_to_original.shape == new_attn_weights_to_original.shape,'shape of old wts and new wts must be the same'
+            if first_token:
+                attn_weights[:,:,recall_start_index:,story_start_index:recall_start_index] = new_attn_weights_to_original.to(query_states.dtype)
+            else:
+                attn_weights[:,:,:,story_start_index:recall_start_index] = new_attn_weights_to_original.to(query_states.dtype)
+            
 
         attn_weights = nn.functional.dropout(attn_weights, p=self.attention_dropout, training=self.training)
         attn_output = torch.matmul(attn_weights, value_states)
