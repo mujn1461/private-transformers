@@ -363,6 +363,7 @@ class LlamaAttention(nn.Module):
                 # so it only has the single token attending to all existing ones
                 attn_weights_to_original = attn_weights[:,:,:,story_start_index:recall_start_index] 
             #print('attn_weights',attn_weights.shape,'attn_wts_to_original',attn_weights_to_original.shape)
+            assert attn_weights_to_original.shape[2]>0,'num to tokens has to be >0'
             attn_weights_to_original = attn_weights_to_original.to(torch.float32)
             sum_attn_to_original = torch.sum(attn_weights_to_original,axis = -1) # nbatch,nheads,recall_tokens
             num_to_tokens = recall_start_index-story_start_index
